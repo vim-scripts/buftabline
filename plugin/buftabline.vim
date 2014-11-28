@@ -1,6 +1,6 @@
 " Vim global plugin for rendering the buffer list in the tabline
 " Licence:     The MIT License (MIT)
-" Commit:      51fe7ccbce3fc769e412a1be3dcb3d96bce5bbcd
+" Commit:      226d860b307b6dbcf21d4420e8d6348db7e13110
 " {{{ Copyright (c) 2014 Aristotle Pagaltzis <pagaltzis@gmx.de>
 " 
 " Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -146,7 +146,7 @@ function! buftabline#render()
 		endfor
 	endif
 
-	let tabs[0].label = substitute(tabs[0].label, lpad, ' ', '')
+	if len(tabs) | let tabs[0].label = substitute(tabs[0].label, lpad, ' ', '') | endif
 
 	return '%T' . join(map(tabs,'printf("%%#BufTabLine%s#%s",v:val.hilite,v:val.label)'),'') . '%#BufTabLineFill#'
 endfunction
