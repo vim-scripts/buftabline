@@ -1,6 +1,6 @@
 " Vim global plugin for rendering the buffer list in the tabline
 " Licence:     The MIT License (MIT)
-" Commit:      226d860b307b6dbcf21d4420e8d6348db7e13110
+" Commit:      93d490ac7991fa8b6a57285158b1bd2af4631b03
 " {{{ Copyright (c) 2014 Aristotle Pagaltzis <pagaltzis@gmx.de>
 " 
 " Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -55,15 +55,18 @@ function! buftabline#render()
 	let tabs_by_tail = {}
 	let currentbuf = winbufnr(0)
 	for bufnum in bufnums
-		let tab = { 'num': bufnum, 'head': '', 'tail': '', 'label': '', 'hilite': '' }
+		let tab = { 'num': bufnum }
 		let tab.hilite = currentbuf == bufnum ? 'Current' : bufwinnr(bufnum) > 0 ? 'Active' : 'Hidden'
 		let bufpath = bufname(bufnum)
 		if strlen(bufpath)
-			let tab.head = fnamemodify(bufpath, ':p:~:.:h')
+			let bufpath = fnamemodify(bufpath, ':p:~:.')
+			let suf = isdirectory(bufpath) ? '/' : ''
+			if strlen(suf) | let bufpath = fnamemodify(bufpath, ':h') | endif
+			let tab.head = fnamemodify(bufpath, ':h')
 			let tab.tail = fnamemodify(bufpath, ':t')
-			let tab.pre = ( show_mod && getbufvar(bufnum, '&mod') ? '+' : '' ) . ( show_num ? bufnum : '' )
-			if strlen(tab.pre) | let tab.pre .= ' ' | endif
-			let tab.label = lpad . tab.pre . tab.tail . ' '
+			let pre = ( show_mod && getbufvar(bufnum, '&mod') ? '+' : '' ) . ( show_num ? bufnum : '' )
+			if strlen(pre) | let pre .= ' ' | endif
+			let tab.fmt = lpad . pre . '%s' . suf . ' '
 			let tabs_by_tail[tab.tail] = get(tabs_by_tail, tab.tail, []) + [tab]
 		elseif -1 < index(['nofile','acwrite'], getbufvar(bufnum, '&buftype')) " scratch buffer
 			let tab.label = lpad . ( show_num ? show_mod ? '!' . bufnum . ' ' : bufnum . ' ! ' : '! ' )
@@ -84,9 +87,8 @@ function! buftabline#render()
 			for tab in group
 				if strlen(tab.head) && tab.head != '.'
 					let tab.tail = fnamemodify(tab.head, ':t') . '/' . tab.tail
-					let tab.label = lpad . tab.pre . tab.tail . ' '
+					let tab.head = fnamemodify(tab.head, ':h')
 				endif
-				let tab.head = fnamemodify(tab.head, ':h')
 				let tabs_by_tail[tab.tail] = get(tabs_by_tail, tab.tail, []) + [tab]
 			endfor
 		endfor
@@ -109,6 +111,7 @@ function! buftabline#render()
 	" 3. sum the string lengths for the left and right halves
 	let currentside = lft
 	for tab in tabs
+		if has_key(tab, 'fmt') | let tab.label = printf(tab.fmt, tab.tail) | endif
 		let tab.width = strwidth(tab.label)
 		if currentbuf == tab.num
 			let halfwidth = tab.width / 2
