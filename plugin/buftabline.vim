@@ -1,6 +1,6 @@
 " Vim global plugin for rendering the buffer list in the tabline
 " Licence:     The MIT License (MIT)
-" Commit:      93d490ac7991fa8b6a57285158b1bd2af4631b03
+" Commit:      056f2010015426f176be249dcb553aa8e093fd72
 " {{{ Copyright (c) 2014 Aristotle Pagaltzis <pagaltzis@gmx.de>
 " 
 " Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -59,7 +59,7 @@ function! buftabline#render()
 		let tab.hilite = currentbuf == bufnum ? 'Current' : bufwinnr(bufnum) > 0 ? 'Active' : 'Hidden'
 		let bufpath = bufname(bufnum)
 		if strlen(bufpath)
-			let bufpath = fnamemodify(bufpath, ':p:~:.')
+			let bufpath = substitute(fnamemodify(bufpath, ':p:~:.'), '^$', '.', '')
 			let suf = isdirectory(bufpath) ? '/' : ''
 			if strlen(suf) | let bufpath = fnamemodify(bufpath, ':h') | endif
 			let tab.head = fnamemodify(bufpath, ':h')
