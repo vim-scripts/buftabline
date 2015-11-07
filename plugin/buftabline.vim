@@ -1,7 +1,7 @@
 " Vim global plugin for rendering the buffer list in the tabline
 " Licence:     The MIT License (MIT)
-" Commit:      056f2010015426f176be249dcb553aa8e093fd72
-" {{{ Copyright (c) 2014 Aristotle Pagaltzis <pagaltzis@gmx.de>
+" Commit:      9d513e12bca5560faf2a6eb8e9c631bf8ea1d862
+" {{{ Copyright (c) 2015 Aristotle Pagaltzis <pagaltzis@gmx.de>
 " 
 " Permission is hereby granted, free of charge, to any person obtaining a copy
 " of this software and associated documentation files (the "Software"), to deal
@@ -22,8 +22,8 @@
 " THE SOFTWARE.
 " }}}
 
-if v:version < 700
-	echoerr printf('Vim 7 is required for buftabline (this is only %d.%d)',v:version/100,v:version%100)
+if v:version < 703 " because of strwidth()
+	echoerr printf('Vim 7.3 is required for buftabline (this is only %d.%d)',v:version/100,v:version%100)
 	finish
 endif
 
@@ -37,24 +37,31 @@ hi default link BufTabLineActive  PmenuSel
 hi default link BufTabLineHidden  TabLine
 hi default link BufTabLineFill    TabLineFill
 
+let g:buftabline_numbers    = get(g:, 'buftabline_numbers',    0)
+let g:buftabline_indicators = get(g:, 'buftabline_indicators', 0)
+let g:buftabline_separators = get(g:, 'buftabline_separators', 0)
+let g:buftabline_show       = get(g:, 'buftabline_show',       2)
+
 function! buftabline#user_buffers() " help buffers are always unlisted, but quickfix buffers are not
 	return filter(range(1,bufnr('$')),'buflisted(v:val) && "quickfix" !=? getbufvar(v:val, "&buftype")')
 endfunction
 
 let s:prev_currentbuf = winbufnr(0)
 function! buftabline#render()
-	let show_num = exists('g:buftabline_numbers')    ? g:buftabline_numbers    : 0
-	let show_mod = exists('g:buftabline_indicators') ? g:buftabline_indicators : 0
-	let show_sep = exists('g:buftabline_separators') ? g:buftabline_separators : 0
+	let show_num = g:buftabline_numbers == 1
+	let show_ord = g:buftabline_numbers == 2
+	let show_mod = g:buftabline_indicators
+	let lpad     = g:buftabline_separators ? nr2char(0x23B8) : ' '
 
-	let lpad = show_sep ? nr2char(0x23B8) : ' '
 	let bufnums = buftabline#user_buffers()
 
 	" pick up data on all the buffers
 	let tabs = []
 	let tabs_by_tail = {}
 	let currentbuf = winbufnr(0)
+	let screen_num = 0
 	for bufnum in bufnums
+		let screen_num = show_num ? bufnum : show_ord ? screen_num + 1 : ''
 		let tab = { 'num': bufnum }
 		let tab.hilite = currentbuf == bufnum ? 'Current' : bufwinnr(bufnum) > 0 ? 'Active' : 'Hidden'
 		let bufpath = bufname(bufnum)
@@ -64,16 +71,15 @@ function! buftabline#render()
 			if strlen(suf) | let bufpath = fnamemodify(bufpath, ':h') | endif
 			let tab.head = fnamemodify(bufpath, ':h')
 			let tab.tail = fnamemodify(bufpath, ':t')
-			let pre = ( show_mod && getbufvar(bufnum, '&mod') ? '+' : '' ) . ( show_num ? bufnum : '' )
+			let pre = ( show_mod && getbufvar(bufnum, '&mod') ? '+' : '' ) . screen_num
 			if strlen(pre) | let pre .= ' ' | endif
-			let tab.fmt = lpad . pre . '%s' . suf . ' '
+			let tab.fmt = pre . '%s' . suf
 			let tabs_by_tail[tab.tail] = get(tabs_by_tail, tab.tail, []) + [tab]
 		elseif -1 < index(['nofile','acwrite'], getbufvar(bufnum, '&buftype')) " scratch buffer
-			let tab.label = lpad . ( show_num ? show_mod ? '!' . bufnum . ' ' : bufnum . ' ! ' : '! ' )
+			let tab.label = ( show_mod ? '!' . screen_num : screen_num ? screen_num . ' !' : '!' )
 		else " unnamed file
-			let tab.label = lpad
-						\ . ( show_mod && getbufvar(bufnum, '&mod') ? '+' : '' )
-						\ . ( show_num ? bufnum . ' ' : '* ' )
+			let tab.label = ( show_mod && getbufvar(bufnum, '&mod') ? '+' : '' )
+			\             . ( screen_num ? screen_num : '*' )
 		endif
 		let tabs += [tab]
 	endfor
@@ -111,7 +117,7 @@ function! buftabline#render()
 	" 3. sum the string lengths for the left and right halves
 	let currentside = lft
 	for tab in tabs
-		if has_key(tab, 'fmt') | let tab.label = printf(tab.fmt, tab.tail) | endif
+		let tab.label = lpad . ( has_key(tab, 'fmt') ? printf(tab.fmt, tab.tail) : tab.label ) . ' '
 		let tab.width = strwidth(tab.label)
 		if currentbuf == tab.num
 			let halfwidth = tab.width / 2
@@ -158,11 +164,10 @@ function! buftabline#update(deletion)
 	set tabline=
 	if tabpagenr('$') > 1 | set guioptions+=e showtabline=2 | return | endif
 	set guioptions-=e
-	let show = exists('g:buftabline_show') ? g:buftabline_show : 2
-	if 0 == show
+	if 0 == g:buftabline_show
 		set showtabline=1
 		return
-	elseif 1 == show
+	elseif 1 == g:buftabline_show
 		let bufnums = buftabline#user_buffers()
 		let total = len(bufnums)
 		if a:deletion && -1 < index(bufnums, bufnr('%'))
@@ -171,7 +176,7 @@ function! buftabline#update(deletion)
 			let total -= 1
 		endif
 		let &g:showtabline = 1 + ( total > 1 )
-	elseif 2 == show
+	elseif 2 == g:buftabline_show
 		set showtabline=2
 	endif
 	set tabline=%!buftabline#render()
